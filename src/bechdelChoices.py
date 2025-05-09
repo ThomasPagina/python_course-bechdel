@@ -6,20 +6,12 @@ from generateText import generate_text
 from typing import List
 
 class StatementSet:
-    """
-    Encapsulates a set of three ordered statements for classification and scoring.
-    """
     def __init__(self, name: str, prompt_intro: str, statements: List[str]):
         self.name = name
         self.prompt_intro = prompt_intro
-        # Ordered best→worst for Bechdel alignment
         self.statements = statements
 
     def process(self, conversation: str) -> float:
-        """
-        Generate the model response, parse it, and return a score between -1 and 1.
-        """
-        # Build prompt with options a), b), c)
         options = "\n".join(
             f"{chr(97 + i)}) {text}" for i, text in enumerate(self.statements)
         )
@@ -33,7 +25,6 @@ class StatementSet:
         print(f"Response:\n{response}\n")
         choice = response[:1]
         idx = ord(choice) - 97
-        # Map index 0→1.0, 1→0.0, 2→-1.0
         if idx == 0:
             return 1.0
         elif idx == 1:
@@ -41,7 +32,6 @@ class StatementSet:
         elif idx == 2:
             return -1.0
         else:
-            # Unknown response
             return 0.0
 
 class SimpleBechdelPipeline:
@@ -50,7 +40,6 @@ class SimpleBechdelPipeline:
                  output_file: str,
                  statement_sets: List[StatementSet]):
         self.data_folder = data_folder
-        # pattern: data/conversations/<scriptname><number>_<style>.txt
         self.input_pattern = os.path.join(data_folder, '*.txt')
         self.output_file = output_file
         self.statement_sets = statement_sets
@@ -63,25 +52,20 @@ class SimpleBechdelPipeline:
             writer.writeheader()
 
             for filepath in files:
-                # extract metadata from filename
                 base = os.path.splitext(os.path.basename(filepath))[0]
-                # split script number and style by underscore
                 if '_' in base:
                     name_part, style = base.split('_', 1)
                 else:
                     name_part, style = base, ''
-                # split trailing digits for number
                 m = re.match(r"([a-zA-Z]+)(\d+)$", name_part)
                 if m:
                     script, number = m.group(1), m.group(2)
                 else:
                     script, number = name_part, ''
 
-                # read conversation
                 with open(filepath, encoding='utf-8') as f:
                     conv = f.read().strip()
 
-                # process each test
                 for stmt_set in self.statement_sets:
                     score = stmt_set.process(conv)
                     writer.writerow({
@@ -94,7 +78,6 @@ class SimpleBechdelPipeline:
         print(f"Done! Ratings saved to {self.output_file}")
 
 if __name__ == '__main__':
-    # Define the four Bechdel-oriented statement sets
     subject_set = StatementSet(
         name='Subject',
         prompt_intro='Which of the following three statements is more applicable to this conversation regarding its primary subject?',
@@ -132,7 +115,6 @@ if __name__ == '__main__':
         ]
     )
 
-    # Initialize and run the pipeline
     pipeline = SimpleBechdelPipeline(
         data_folder='data/conversations',
         output_file='ratings_scored.csv',
