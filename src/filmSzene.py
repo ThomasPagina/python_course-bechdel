@@ -1,13 +1,8 @@
 import os
 
-
 from generateText import generate_text
 
 def load_scripts(script_dir: str = "./data/scripts") -> dict:
-    """
-    Load all .txt script files from the given directory.
-    Returns a dict mapping script_name -> full_scene_description.
-    """
     scripts = {}
     for filename in sorted(os.listdir(script_dir)):
         if filename.endswith(".txt"):
@@ -17,12 +12,7 @@ def load_scripts(script_dir: str = "./data/scripts") -> dict:
                 scripts[name] = f.read().strip()
     return scripts
 
-
 def save_script(content: str, script_name: str, style: str, output_dir: str = "./data/output-2"):
-    """
-    Save generated script content to a file.
-    Filename includes script_name and style.
-    """
     safe_style = style.lower().replace(" ", "_").replace(",", "")
     safe_name = script_name.lower().replace(" ", "_")
     os.makedirs(output_dir, exist_ok=True)
@@ -33,7 +23,6 @@ def save_script(content: str, script_name: str, style: str, output_dir: str = ".
     print(f"Saved {path}")
 
 if __name__ == "__main__":
-    # Define styles
     styles = [
         "1970s arthouse cinema",
         "Italian neorealism",
@@ -44,7 +33,6 @@ if __name__ == "__main__":
         "Anime"
     ]
 
-    # Hardcoded brief introductions per style
     scene_brief_map = {
         "1970s arthouse cinema": "In a sun-dappled living room.",
         "Italian neorealism": (
@@ -65,13 +53,10 @@ if __name__ == "__main__":
         "Anime": (
             "In a vibrant, bustling city street, two friends, one with bright pink hair and the other with blue, engage in a lively conversation."
         ),
-
     }
 
-    # Load neutral scene descriptions
     scripts = load_scripts()
 
-    # Generate dialogues for each script and style
     for script_name, full_desc in scripts.items():
         for style in styles:
             brief_desc = scene_brief_map[style]
