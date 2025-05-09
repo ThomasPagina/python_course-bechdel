@@ -6,11 +6,9 @@ from huggingface_hub import login
 import torch
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 
-# --- Global Constants ---
-DEFAULT_TEMP = 1.2  # Global temperature for text generation
+DEFAULT_TEMP = 1.2
 MODEL_ID = "google/gemma-3-4b-it"
 
-# --- Environment & Model Setup ---
 load_dotenv()
 hf_token = os.environ.get("HUGGING_FACE")
 if not hf_token:
@@ -23,15 +21,13 @@ model = Gemma3ForConditionalGeneration.from_pretrained(
     device_map="auto"
 ).eval()
 
-# --- Conversation State: Topic Tracking, End Signals, and Overrides ---
 current_topic_info = {
     "initiator": None,
     "rounds": 0
 }
 end_signalers = set()
-next_speaker_override = None  # Name of agent to speak next (for probes)
+next_speaker_override = None
 
-# --- Text generation helper ---
 def generate_text(
     prompt: str,
     max_new_tokens: int = 100,
@@ -56,7 +52,6 @@ def generate_text(
         )
     return processor.decode(outputs[0][input_len:], skip_special_tokens=True).strip()
 
-# --- Helper Functions ---
 def clean_generated_text(generated_text, prompt=""):
     if prompt and generated_text.startswith(prompt):
         generated_text = generated_text[len(prompt):]
@@ -76,26 +71,21 @@ def clean_generated_text(generated_text, prompt=""):
 def build_dialog_prompt(dialog_turns):
     return "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in dialog_turns)
 
-# --- Decision Logic with Extended Actions ---
 def decide_action(dialog_turns, agent):
     global current_topic_info, end_signalers, next_speaker_override
-    # End-Signal detection
     if dialog_turns:
         last = dialog_turns[-1]
         txt = last['text'].lower()
         if any(w in txt for w in ["schluss", "ende", "abschließen", "beenden"]):
             end_signalers.add(last['speaker'])
-    # If probe override exists, only that agent speaks
     if next_speaker_override and agent.name == next_speaker_override:
         next_speaker_override = None
         return "reflect_end" if end_signalers and agent.name not in end_signalers else agent.special_fallback
     if next_speaker_override:
         return None
-    # Special actions: summary or probe
     for action, prob in agent.special_actions.items():
         if random.random() < prob:
             return action
-    # Standard logic
     if end_signalers and agent.name not in end_signalers:
         return "reflect_end"
     if dialog_turns and dialog_turns[-1]['text'].strip().endswith('?'):
@@ -108,7 +98,6 @@ def decide_action(dialog_turns, agent):
         return random.choices(["change","support"],[0.6,0.4])[0]
     return random.choices(["change","support"],[0.4,0.6])[0]
 
-# --- Agent Class with Special Actions ---
 class Agent:
     def __init__(
         self, name, topics, role_desc,
@@ -119,7 +108,6 @@ class Agent:
         self.topics = topics
         self.role_desc = role_desc
         self.current_topic_index = 0
-        # e.g. {"summary":0.05, "probe":0.1}
         self.special_actions = special_actions or {}
         self.special_fallback = special_fallback
 
@@ -133,7 +121,6 @@ class Agent:
         raw = generate_text(prompt, max_new_tokens=max_new_tokens)
         return clean_generated_text(raw, prompt)
 
-    # Common dialog behaviors
     def speak_greeting(self, scene):
         prompt = f"Scene: {scene}\n# role: {self.name}\n{self.role_desc}\n# task: Greet briefly.\nGreeting:"
         return self.generate_response(prompt, max_new_tokens=50)
@@ -172,26 +159,20 @@ class Agent:
         )
         return self.generate_response(prompt, max_new_tokens=100)
 
-# --- Dialog Simulation with Overrides & Specials ---
 def run_dialog_simulation(agents, max_rounds=10):
     global all_agents, next_speaker_override
     all_agents = agents
     dialog_turns = []
-    # Scene setup
     scene = generate_text(f"Generate a concise scene description for: {', '.join(a.name for a in agents)}", max_new_tokens=80)
     dialog_turns.append({"speaker":"Narrator","text":scene})
     print(f"Scene: {scene}\n")
-    # Greetings
     for a in agents:
         g = a.speak_greeting(scene)
         dialog_turns.append({"speaker":a.name,"text":g})
         print(f"{a.name}: {g}")
-
-    # Simulation rounds
     for rnd in range(1, max_rounds+1):
         if not any(a.get_current_topic() for a in agents): break
         print(f"\n--- Round {rnd} ---")
-        # If probe override, handle that speaker only
         if next_speaker_override:
             speaker = next(a for a in agents if a.name==next_speaker_override)
             action = decide_action(dialog_turns, speaker)
@@ -200,7 +181,6 @@ def run_dialog_simulation(agents, max_rounds=10):
             dialog_turns.append({"speaker":speaker.name,"text":line})
             print(f"{speaker.name} ({action}): {line}")
             continue
-        # Round-robin
         for a in agents:
             action = decide_action(dialog_turns, a)
             if not action: continue
@@ -210,14 +190,11 @@ def run_dialog_simulation(agents, max_rounds=10):
             print(f"{a.name} ({action}): {line}")
             if action in ("support","confirm") and current_topic_info['initiator']:
                 current_topic_info['rounds'] += 1
-
-    # Output full dialogue
     full = "\n".join(f"{t['speaker']}: {t['text']}" for t in dialog_turns)
     xml = "".join(f"<sp who=\"#{t['speaker']}\"><speaker>{t['speaker']}.</speaker><p>{t['text']}</p></sp>\n" for t in dialog_turns)
     print("\nFinal Dialogue:\n", full)
     return full, xml
 
-# --- Example Usage ---
 if __name__ == "__main__":
     def save_dialog_history(prompt, xml, prefix="dialog"):
         with open(f"{prefix}_prompt.txt", "w") as f:
@@ -225,7 +202,6 @@ if __name__ == "__main__":
         with open(f"{prefix}_history.xml", "w") as f:
             f.write(xml)
 
-    # Create sample agents with their topics, roles und Spezialaktionen
     agent1 = Agent(
         name="Alice",
         topics=["technology", "artificial intelligence", "robotics"],
